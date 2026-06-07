@@ -25,9 +25,9 @@ app.use(morgan(morganFormat, {
 
 // ── 2. Security & CORS ──
 const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? [process.env.CLIENT_URL].filter(Boolean) // Strict Prod
+    ? (process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(o => o.trim()) : []) // Strict Prod (supports comma-separated URLs)
     : [
-        process.env.CLIENT_URL,
+        ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(o => o.trim()) : []),
         'http://localhost:5000',
         'http://localhost:5500',
         'http://localhost:8080',
@@ -42,7 +42,7 @@ app.use(cors({
             callback(null, true);
         } else {
             console.warn(`[CORS Blocked] Origin: ${origin}`);
-            callback(new Error('Not allowed by CORS Policy'));
+            callback(null, false); // Block the origin by passing false, which returns standard CORS headers mismatch to browser instead of throwing a 500 error
         }
     },
     credentials: true,
