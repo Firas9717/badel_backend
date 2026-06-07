@@ -5,7 +5,7 @@
 const cookieOptions = {
     httpOnly: true, // Bloque l'accès JS (Protection XSS)
     secure: process.env.NODE_ENV === 'production', // Uniquement en HTTPS en production
-    sameSite: 'lax', // Équilibre entre sécurité et UX (Protection CSRF)
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Support cross-domain cookies in prod
     path: '/', // Accessible sur tout le site
     maxAge: 365 * 24 * 60 * 60 * 1000 // 365 jours
 };
