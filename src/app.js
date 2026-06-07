@@ -24,31 +24,57 @@ app.use(morgan(morganFormat, {
 }));
 
 // ── 2. Security & CORS ──
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? (process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(o => o.trim()) : []) // Strict Prod (supports comma-separated URLs)
-    : [
-        ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(o => o.trim()) : []),
+// Build allowed origins list. Supports comma-separated CLIENT_URL for multiple frontends.
+const buildAllowedOrigins = () => {
+    const fromEnv = process.env.CLIENT_URL
+        ? process.env.CLIENT_URL.split(',').map(o => o.trim()).filter(Boolean)
+        : [];
+
+    if (process.env.NODE_ENV === 'production') {
+        if (fromEnv.length === 0) {
+            // Safety fallback: warn loudly but don't lock out everything
+            console.warn('[CORS] ⚠️  CLIENT_URL is not set in production! Set it in Railway env vars.');
+        }
+        return fromEnv;
+    }
+
+    // Development: allow all common local origins
+    return [
+        ...fromEnv,
         'http://localhost:5000',
         'http://localhost:5500',
         'http://localhost:8080',
         'http://127.0.0.1:5000',
         'http://127.0.0.1:5500',
         'http://127.0.0.1:8080'
-    ].filter(Boolean); // Relaxed Dev
+    ].filter(Boolean);
+};
+
+const allowedOrigins = buildAllowedOrigins();
+console.log('[CORS] Allowed origins:', allowedOrigins);
 
 app.use(cors({
     origin: (origin, callback) => {
+        // Allow server-to-server calls (no origin) and listed origins
         if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`[CORS Blocked] Origin: ${origin}`);
-            callback(null, false); // Block the origin by passing false, which returns standard CORS headers mismatch to browser instead of throwing a 500 error
+            return callback(null, true);
         }
+        // In production with no allowed origins configured, allow all as emergency fallback
+        if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+            console.warn(`[CORS] Emergency fallback — allowing origin: ${origin}`);
+            return callback(null, true);
+        }
+        logger.error(`[CORS Blocked] Origin not allowed: ${origin}`);
+        return callback(new Error(`Not allowed by CORS Policy`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200 // Some browsers (IE11) choke on 204
 }));
+
+// Handle pre-flight OPTIONS requests explicitly
+app.options('*', cors());
 
 // Strict Security Headers
 app.use(helmet({

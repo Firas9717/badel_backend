@@ -115,11 +115,12 @@ async function login(req, res) {
 
 // ── Déconnexion ──
 async function logout(req, res) {
-  // Effacer le cookie en utilisant les mêmes options de sécurité
+  // clearCookie options MUST exactly match the options used when setting the cookie,
+  // otherwise the browser won't remove it (especially sameSite/secure in production).
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     path: '/'
   });
 
